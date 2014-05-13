@@ -1,6 +1,7 @@
 var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
+var bcrypt = require('bcrypt-nodejs');
 
 var db = require('./app/config');
 var Users = require('./app/collections/users');
@@ -17,6 +18,9 @@ app.configure(function() {
   app.use(partials());
   app.use(express.bodyParser())
   app.use(express.static(__dirname + '/public'));
+  // include express.cookies and express.sessions
+  app.use(express.cookieParser());
+  app.use(express.session({secret: 'insert something super secret'}));
 });
 
 app.get('/', function(req, res) {
@@ -42,7 +46,7 @@ app.get('/links', function(req, res) {
 });
 
 // post requests for login and signup
-
+//
 app.post('/signup', function(req, res) {
   var username = req.body.username;
   var password = req.body.password;
@@ -68,6 +72,30 @@ app.post('/signup', function(req, res) {
         res.redirect('/login');
       });
     });
+});
+
+app.post('/login', function(req, res) {
+  // get login credentials
+  var username = req.body.username;
+  var password = req.body.password;
+
+  // hash password and check against database
+  bcrypt.hash(password, null, null, function(err, hash) {
+    if (err) {
+      throw err;
+    }
+    bcrypt.compare(password, hash, function(err, result) {
+      // todo if match, redirect to main page with users info
+      if (err) {
+        throw err;
+      }
+      if (result) {
+        res.redirect('/');
+      } else {
+        res.redirect('/login'); // else respawn login page with error message
+      }
+    });
+  });
 });
 
 app.post('/links', function(req, res) {
