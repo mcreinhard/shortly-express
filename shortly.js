@@ -23,6 +23,24 @@ app.configure(function() {
   app.use(express.session({secret: 'insert something super secret'}));
 });
 
+var checkUser = function(req, res, next) {
+  // check if the user if logged in
+  if (req.session.user) {
+    next();
+  } else {
+    // if not, redirect to login page
+    res.redirect('/login');
+  }
+};
+
+// todo: max session length?
+
+// routes that require authentication
+app.all('/', checkUser);
+app.all('/create', checkUser);
+app.all('/links', checkUser);
+
+
 app.get('/', function(req, res) {
   res.render('index');
 });
@@ -39,14 +57,21 @@ app.get('/signup', function(req, res) {
   res.render('signup');
 });
 
+// filter links to only links that correspond with the session user
 app.get('/links', function(req, res) {
-  Links.reset().fetch().then(function(links) {
+  Links.reset().query(function(qb) {
+    qb.join('users', 'urls.user_id', '=', 'users.id')
+    .where('users.username', req.session.user);
+  })
+  .fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
 
-// post requests for login and signup
-//
+/************************************************************/
+// Write your authentication routes here
+/************************************************************/
+
 app.post('/signup', function(req, res) {
   var username = req.body.username;
   var password = req.body.password;
@@ -78,24 +103,23 @@ app.post('/login', function(req, res) {
   // get login credentials
   var username = req.body.username;
   var password = req.body.password;
-
-  // hash password and check against database
-  bcrypt.hash(password, null, null, function(err, hash) {
-    if (err) {
-      throw err;
-    }
-    bcrypt.compare(password, hash, function(err, result) {
-      // todo if match, redirect to main page with users info
-      if (err) {
-        throw err;
-      }
-      if (result) {
-        res.redirect('/');
-      } else {
-        res.redirect('/login'); // else respawn login page with error message
-      }
+  var hash = db.knex('users') // retrieve hashed password from db
+    .where({username: username})
+    .select('password')
+    .then( function(hash) {
+      hash = hash[0].password;
+      bcrypt.compare(password, hash, function(err, result) {
+        if (err) { throw err; }
+        if (result) {
+          req.session.regenerate(function(){ // generate new session on login success
+            req.session.user = username;
+            res.redirect('/');
+          });
+        } else {
+          res.redirect('/login'); // else respawn login page with error message
+        }
+      });
     });
-  });
 });
 
 app.post('/links', function(req, res) {
@@ -116,24 +140,25 @@ app.post('/links', function(req, res) {
           return res.send(404);
         }
 
-        var link = new Link({
-          url: uri,
-          title: title,
-          base_url: req.headers.origin
-        });
+        db.knex('users').where({username: req.session.user}).select('id')
+        .then (function(results) {
+          var link = new Link({
+            url: uri,
+            title: title,
+            base_url: req.headers.origin,
+            user_id: results[0].id
+          });
 
-        link.save().then(function(newLink) {
-          Links.add(newLink);
-          res.send(200, newLink);
+          link.save().then(function(newLink) {
+            Links.add(newLink);
+            res.send(200, newLink);
+          });
         });
       });
     }
   });
 });
 
-/************************************************************/
-// Write your authentication routes here
-/************************************************************/
 
 
 
