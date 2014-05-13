@@ -8,6 +8,13 @@ var User = db.Model.extend({
   hasTimestamps: true,
   links: function() {
     return this.hasMany(Link);
+  },
+  initialize: function() {
+    var that = this;
+    bcrypt.hash(this.get('password'), null, null, function(err, hash) {
+      if (err) throw err;
+      that.set('password', hash);
+    });
   }
 });
 

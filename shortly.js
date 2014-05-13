@@ -27,10 +27,47 @@ app.get('/create', function(req, res) {
   res.render('index');
 });
 
+app.get('/login', function(req, res) {
+  res.render('login');
+});
+
+app.get('/signup', function(req, res) {
+  res.render('signup');
+});
+
 app.get('/links', function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
-  })
+  });
+});
+
+// post requests for login and signup
+
+app.post('/signup', function(req, res) {
+  var username = req.body.username;
+  var password = req.body.password;
+
+  // check if valid username (see if it's already taken)
+  db.knex('users')
+    .where({username: username})
+    .select()
+    .then(function(results) {
+      if (results.length > 0) {
+        console.log('Username ' + username + ' is already taken');
+        return res.send(400, 'Username ' + username + ' is already taken');
+      }
+      // new User - create new user, hash password?
+      var user = new User({
+        username: username,
+        password: password // to be encrypted
+      });
+      // save the new user
+      user.save().then(function(newUser) {
+        Users.add(newUser);
+        // redirect to main page as logged in user
+        res.redirect('/login');
+      });
+    });
 });
 
 app.post('/links', function(req, res) {
