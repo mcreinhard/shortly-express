@@ -112,6 +112,7 @@ app.post('/login', function(req, res) {
         if (err) { throw err; }
         if (result) {
           req.session.regenerate(function(){ // generate new session on login success
+            req.session.cookie.maxAge = 3600000; // 3600000 is one hour
             req.session.user = username;
             res.redirect('/');
           });
@@ -120,6 +121,14 @@ app.post('/login', function(req, res) {
         }
       });
     });
+});
+
+// logout
+app.get('/logout', function(req, res) {
+  // end session
+  req.session.destroy(function(err) {
+    res.redirect('/login');
+  });
 });
 
 app.post('/links', function(req, res) {
